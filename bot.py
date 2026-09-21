@@ -153,14 +153,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.args:
 
         try:
-
             referrer = int(context.args[0])
 
             if referrer == user.id:
                 referrer = None
 
-        except:
-
+        except ValueError:
             referrer = None
 
     if get_user(user.id) is None:
@@ -185,7 +183,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "💰 رصيدي",
                 callback_data="balance"
             ),
-
             InlineKeyboardButton(
                 "👥 الإحالات",
                 callback_data="referrals"
@@ -282,18 +279,83 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await query.message.reply_text(
             "💰 رصيدك الحالي:\n\n"
-            "{:.6f} YEM".format(balance)
+            + str(round(balance, 6))
+            + " YEM"
         )
 
     elif query.data == "referrals":
 
-        bot_username = (
-            await context.bot.get_me()
-        ).username
+        bot_info = await context.bot.get_me()
+
+        bot_username = bot_info.username
 
         link = (
-            "https://t.me/{0}?start={1}"
-            .format(
-                bot_username,
-                user_id
-           
+            "https://t.me/"
+            + bot_username
+            + "?start="
+            + str(user_id)
+        )
+
+        await query.message.reply_text(
+            "👥 رابط الإحالة الخاص بك:\n\n"
+            + link
+            + "\n\nشارك الرابط مع أصدقائك."
+        )
+
+    elif query.data == "daily":
+
+        await query.message.reply_text(
+            "🎁 نظام المكافأة اليومية سيتم تفعيله قريبًا."
+        )
+
+    elif query.data == "withdraw":
+
+        await query.message.reply_text(
+            "💸 نظام السحب سيتم تفعيله بعد تجهيز نظام السحب."
+        )
+
+
+def main():
+
+    if not TOKEN:
+
+        print("BOT_TOKEN غير موجود")
+
+        return
+
+    if not DATABASE_URL:
+
+        print("DATABASE_URL غير موجود")
+
+        return
+
+    init_db()
+
+    application = (
+        Application
+        .builder()
+        .token(TOKEN)
+        .build()
+    )
+
+    application.add_handler(
+        CommandHandler(
+            "start",
+            start
+        )
+    )
+
+    application.add_handler(
+        CallbackQueryHandler(
+            button_handler
+        )
+    )
+
+    print("YEM Mining Bot Started")
+
+    application.run_polling()
+
+
+if __name__ == "__main__":
+
+    main()
