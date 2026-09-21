@@ -130,11 +130,9 @@ def init_blockchain():
         return True
 
     except Exception as e:
-
-        print("Blockchain Error:")
-        print(e)
-
-        return False
+    print("Blockchain Error: " + str(e))
+    import traceback
+    traceback.print_exc()
 
 
 # =========================================================
