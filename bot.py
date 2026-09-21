@@ -22,7 +22,7 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 
 # رقم Telegram الخاص بالأدمن
 # ضع رقم حسابك هنا
-ADMIN_ID = 123456789
+ADMIN_ID = 6494612745
 
 # رصيد البداية
 START_BALANCE = 1.0
