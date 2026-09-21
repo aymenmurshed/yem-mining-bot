@@ -76,13 +76,57 @@ withdraw_lock = threading.Lock()
 
 
 def init_blockchain():
+    global w3, hot_account
 
-    global w3
-    global hot_account
+    try:
+        print("=== BSC INITIALIZATION ===")
 
-    if not PRIVATE_KEY:
+        rpc_url = os.getenv("BSC_RPC_URL")
+        private_key = os.getenv("HOT_WALLET_PRIVATE_KEY")
 
-        print("HOT_WALLET_PRIVATE_KEY غير موجود")
+        print("BSC_RPC_URL exists: " + str(bool(rpc_url)))
+        print("HOT_WALLET_PRIVATE_KEY exists: " + str(bool(private_key)))
+
+        if not rpc_url:
+            raise Exception("BSC_RPC_URL is missing")
+
+        if not private_key:
+            raise Exception("HOT_WALLET_PRIVATE_KEY is missing")
+
+        w3 = Web3(Web3.HTTPProvider(rpc_url))
+
+        if not w3.is_connected():
+            raise Exception("Cannot connect to BSC RPC")
+
+        print("BSC RPC connected")
+
+        chain_id = w3.eth.chain_id
+        print("Chain ID: " + str(chain_id))
+
+        if chain_id != 56:
+            raise Exception("Wrong network. Expected BSC Mainnet Chain ID 56")
+
+        hot_account = w3.eth.account.from_key(private_key)
+
+        print("Hot wallet address: " + hot_account.address)
+
+        balance = w3.eth.get_balance(hot_account.address)
+        balance_bnb = w3.from_wei(balance, "ether")
+
+        print("Hot wallet BNB balance: " + str(balance_bnb))
+
+        print("=== BSC READY ===")
+
+        return True
+
+    except Exception as e:
+        print("=== BLOCKCHAIN ERROR ===")
+        print("Error type: " + type(e).__name__)
+        print("Error: " + str(e))
+        print("========================")
+
+        w3 = None
+        hot_account = None
 
         return False
 
