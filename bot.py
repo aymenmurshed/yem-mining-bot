@@ -28,8 +28,9 @@ from telegram.ext import (
 TOKEN = os.environ.get("BOT_TOKEN")
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
-# ضع Telegram ID الخاص بك هنا
+# Telegram ID الخاص بالأدمن
 ADMIN_ID = 6494612745
+
 
 # =========================================================
 # BNB / BSC
@@ -46,6 +47,7 @@ PRIVATE_KEY = os.environ.get(
     "HOT_WALLET_PRIVATE_KEY"
 )
 
+
 # =========================================================
 # إعدادات التعدين
 # =========================================================
@@ -55,13 +57,13 @@ START_BALANCE = 1.0
 # 0.001 BNB لكل دقيقة
 MINING_RATE = 0.001
 
+
 # =========================================================
 # إعدادات السحب
 # =========================================================
 
 MIN_WITHDRAW = 0.01
 
-# رسوم إضافية اختيارية
 WITHDRAW_FEE = 0.0
 
 
@@ -75,66 +77,79 @@ hot_account = None
 withdraw_lock = threading.Lock()
 
 
+# =========================================================
+# تهيئة BSC
+# =========================================================
+
 def init_blockchain():
-    global w3, hot_account
+
+    global w3
+    global hot_account
 
     try:
+
         print("=== BSC INITIALIZATION ===")
 
-        rpc_url = os.getenv("BSC_RPC_URL")
-        private_key = os.getenv("HOT_WALLET_PRIVATE_KEY")
+        rpc_url = os.environ.get(
+            "BSC_RPC_URL"
+        )
 
-        print("BSC_RPC_URL exists: " + str(bool(rpc_url)))
-        print("HOT_WALLET_PRIVATE_KEY exists: " + str(bool(private_key)))
+        private_key = os.environ.get(
+            "HOT_WALLET_PRIVATE_KEY"
+        )
+
+        print(
+            "BSC_RPC_URL exists: "
+            + str(bool(rpc_url))
+        )
+
+        print(
+            "HOT_WALLET_PRIVATE_KEY exists: "
+            + str(bool(private_key))
+        )
 
         if not rpc_url:
-            raise Exception("BSC_RPC_URL is missing")
+
+            raise Exception(
+                "BSC_RPC_URL is missing"
+            )
 
         if not private_key:
-            raise Exception("HOT_WALLET_PRIVATE_KEY is missing")
 
-        w3 = Web3(Web3.HTTPProvider(rpc_url))
+            raise Exception(
+                "HOT_WALLET_PRIVATE_KEY is missing"
+            )
 
-        if not w3.is_connected():
-            raise Exception("Cannot connect to BSC RPC")
+        private_key = private_key.strip()
 
-        print("BSC RPC connected")
+        # إزالة 0x للفحص فقط
+        key_check = private_key
 
-        chain_id = w3.eth.chain_id
-        print("Chain ID: " + str(chain_id))
+        if key_check.startswith("0x"):
 
-        if chain_id != 56:
-            raise Exception("Wrong network. Expected BSC Mainnet Chain ID 56")
+            key_check = key_check[2:]
 
-        hot_account = w3.eth.account.from_key(private_key)
+        # المفتاح يجب أن يكون 64 خانة
+        if len(key_check) != 64:
 
-        print("Hot wallet address: " + hot_account.address)
+            raise Exception(
+                "HOT_WALLET_PRIVATE_KEY must contain exactly 64 hexadecimal characters"
+            )
 
-        balance = w3.eth.get_balance(hot_account.address)
-        balance_bnb = w3.from_wei(balance, "ether")
+        # التأكد أن كل الخانات Hexadecimal
+        try:
 
-        print("Hot wallet BNB balance: " + str(balance_bnb))
+            int(key_check, 16)
 
-        print("=== BSC READY ===")
+        except Exception:
 
-        return True
-
-    except Exception as e:
-        print("=== BLOCKCHAIN ERROR ===")
-        print("Error type: " + type(e).__name__)
-        print("Error: " + str(e))
-        print("========================")
-
-        w3 = None
-        hot_account = None
-
-        return False
-
-    try:
+            raise Exception(
+                "HOT_WALLET_PRIVATE_KEY contains invalid hexadecimal characters"
+            )
 
         w3 = Web3(
             Web3.HTTPProvider(
-                BSC_RPC_URL,
+                rpc_url,
                 request_kwargs={
                     "timeout": 30
                 }
@@ -143,40 +158,80 @@ def init_blockchain():
 
         if not w3.is_connected():
 
-            print("فشل الاتصال بشبكة BSC")
+            raise Exception(
+                "Cannot connect to BSC RPC"
+            )
 
-            return False
+        print(
+            "BSC RPC connected"
+        )
+
+        chain_id = w3.eth.chain_id
+
+        print(
+            "Chain ID: "
+            + str(chain_id)
+        )
+
+        if chain_id != BSC_CHAIN_ID:
+
+            raise Exception(
+                "Wrong network. Expected BSC Mainnet Chain ID 56"
+            )
 
         hot_account = w3.eth.account.from_key(
-            PRIVATE_KEY
-        )
-
-        network_id = w3.eth.chain_id
-
-        print(
-            "BSC connected. Chain ID:",
-            network_id
+            private_key
         )
 
         print(
-            "Hot wallet:",
+            "Hot wallet: "
+            + hot_account.address
+        )
+
+        balance_wei = w3.eth.get_balance(
             hot_account.address
         )
 
-        if network_id != BSC_CHAIN_ID:
+        balance_bnb = w3.from_wei(
+            balance_wei,
+            "ether"
+        )
 
-            print(
-                "خطأ: RPC ليس BSC Mainnet."
-            )
+        print(
+            "Hot wallet BNB balance: "
+            + str(balance_bnb)
+        )
 
-            return False
+        print(
+            "=== BSC READY ==="
+        )
 
         return True
 
     except Exception as e:
-    print("Blockchain Error: " + str(e))
-    import traceback
-    traceback.print_exc()
+
+        print(
+            "=== BLOCKCHAIN ERROR ==="
+        )
+
+        print(
+            "Error type: "
+            + type(e).__name__
+        )
+
+        print(
+            "Error: "
+            + str(e)
+        )
+
+        print(
+            "========================"
+        )
+
+        w3 = None
+        hot_account = None
+
+        return False
 
 
 # =========================================================
@@ -193,9 +248,11 @@ def get_db():
 def init_db():
 
     conn = get_db()
+
     cur = conn.cursor()
 
-    cur.execute("""
+    cur.execute(
+        """
         CREATE TABLE IF NOT EXISTS users (
             user_id BIGINT PRIMARY KEY,
             username TEXT,
@@ -203,9 +260,11 @@ def init_db():
             mining_start BIGINT DEFAULT 0,
             referrer BIGINT DEFAULT NULL
         )
-    """)
+        """
+    )
 
-    cur.execute("""
+    cur.execute(
+        """
         CREATE TABLE IF NOT EXISTS withdrawals (
             id SERIAL PRIMARY KEY,
             user_id BIGINT NOT NULL,
@@ -218,13 +277,15 @@ def init_db():
             created_at BIGINT NOT NULL,
             processed_at BIGINT DEFAULT NULL
         )
-    """)
+        """
+    )
 
-    # إضافة الأعمدة إذا كانت قاعدة البيانات قديمة
-    cur.execute("""
+    cur.execute(
+        """
         ALTER TABLE withdrawals
         ADD COLUMN IF NOT EXISTS error_message TEXT DEFAULT NULL
-    """)
+        """
+    )
 
     conn.commit()
 
@@ -239,6 +300,7 @@ def init_db():
 def get_user(user_id):
 
     conn = get_db()
+
     cur = conn.cursor()
 
     cur.execute(
@@ -270,6 +332,7 @@ def create_user(
 ):
 
     conn = get_db()
+
     cur = conn.cursor()
 
     cur.execute(
@@ -282,7 +345,14 @@ def create_user(
             mining_start,
             referrer
         )
-        VALUES (%s, %s, %s, %s, %s)
+        VALUES
+        (
+            %s,
+            %s,
+            %s,
+            %s,
+            %s
+        )
 
         ON CONFLICT (user_id)
         DO NOTHING
@@ -309,11 +379,14 @@ def create_user(
 def update_mining(user_id):
 
     conn = get_db()
+
     cur = conn.cursor()
 
     cur.execute(
         """
-        SELECT balance, mining_start
+        SELECT
+            balance,
+            mining_start
         FROM users
         WHERE user_id = %s
         """,
@@ -330,6 +403,7 @@ def update_mining(user_id):
         return 0.0
 
     balance = float(row[0])
+
     mining_start = int(row[1])
 
     if mining_start > 0:
@@ -391,7 +465,10 @@ def is_valid_bnb_address(wallet):
 
     try:
 
-        int(wallet[2:], 16)
+        int(
+            wallet[2:],
+            16
+        )
 
         return True
 
@@ -407,9 +484,11 @@ def is_valid_bnb_address(wallet):
 def get_hot_wallet_balance():
 
     if w3 is None:
+
         return 0.0
 
     if hot_account is None:
+
         return 0.0
 
     try:
@@ -446,17 +525,35 @@ def send_bnb(
 
     if w3 is None:
 
-        return False, None, (
+        return (
+            False,
+            None,
             "Blockchain غير متصل."
         )
 
     if hot_account is None:
 
-        return False, None, (
+        return (
+            False,
+            None,
             "محفظة الإرسال غير جاهزة."
         )
 
     try:
+
+        private_key = os.environ.get(
+            "HOT_WALLET_PRIVATE_KEY"
+        )
+
+        if not private_key:
+
+            return (
+                False,
+                None,
+                "HOT_WALLET_PRIVATE_KEY غير موجود."
+            )
+
+        private_key = private_key.strip()
 
         destination = w3.to_checksum_address(
             destination
@@ -485,9 +582,10 @@ def send_bnb(
 
         if wallet_balance < required:
 
-            return False, None, (
-                "رصيد محفظة البوت غير كافٍ "
-                "لتغطية المبلغ ورسوم الشبكة."
+            return (
+                False,
+                None,
+                "رصيد محفظة البوت غير كافٍ لتغطية المبلغ ورسوم الشبكة."
             )
 
         nonce = w3.eth.get_transaction_count(
@@ -512,7 +610,7 @@ def send_bnb(
 
         signed = w3.eth.account.sign_transaction(
             transaction,
-            PRIVATE_KEY
+            private_key
         )
 
         tx_hash = w3.eth.send_raw_transaction(
@@ -522,11 +620,15 @@ def send_bnb(
         txid = tx_hash.hex()
 
         print(
-            "BNB transaction sent:",
-            txid
+            "BNB transaction sent: "
+            + txid
         )
 
-        return True, txid, None
+        return (
+            True,
+            txid,
+            None
+        )
 
     except Exception as e:
 
@@ -535,7 +637,11 @@ def send_bnb(
             e
         )
 
-        return False, None, str(e)
+        return (
+            False,
+            None,
+            str(e)
+        )
 
 
 # =========================================================
@@ -550,6 +656,7 @@ def create_withdrawal(
 ):
 
     conn = get_db()
+
     cur = conn.cursor()
 
     try:
@@ -570,19 +677,20 @@ def create_withdrawal(
 
             conn.rollback()
 
-            return False, (
+            return (
+                False,
                 "المستخدم غير موجود."
             )
 
         balance = float(row[0])
 
-        # منع أكثر من طلب معلق
         cur.execute(
             """
             SELECT id
             FROM withdrawals
             WHERE user_id = %s
-            AND status IN (
+            AND status IN
+            (
                 'pending',
                 'processing'
             )
@@ -595,7 +703,8 @@ def create_withdrawal(
 
             conn.rollback()
 
-            return False, (
+            return (
+                False,
                 "لديك طلب سحب قيد المعالجة بالفعل."
             )
 
@@ -603,7 +712,8 @@ def create_withdrawal(
 
             conn.rollback()
 
-            return False, (
+            return (
+                False,
                 "الحد الأدنى للسحب هو "
                 + str(MIN_WITHDRAW)
                 + " BNB."
@@ -617,11 +727,11 @@ def create_withdrawal(
 
             conn.rollback()
 
-            return False, (
+            return (
+                False,
                 "رصيدك غير كافٍ."
             )
 
-        # حجز الرصيد
         new_balance = (
             balance - total
         )
@@ -673,7 +783,10 @@ def create_withdrawal(
 
         conn.commit()
 
-        return True, withdrawal_id
+        return (
+            True,
+            withdrawal_id
+        )
 
     except Exception as e:
 
@@ -684,7 +797,10 @@ def create_withdrawal(
             e
         )
 
-        return False, str(e)
+        return (
+            False,
+            str(e)
+        )
 
     finally:
 
@@ -703,11 +819,11 @@ def process_withdrawal(
     with withdraw_lock:
 
         conn = get_db()
+
         cur = conn.cursor()
 
         try:
 
-            # قفل الطلب
             cur.execute(
                 """
                 SELECT
@@ -728,24 +844,28 @@ def process_withdrawal(
 
                 conn.rollback()
 
-                return False, (
+                return (
+                    False,
                     "طلب السحب غير موجود."
                 )
 
             user_id = row[0]
+
             amount = float(row[1])
+
             wallet = row[2]
+
             status = row[3]
 
             if status != "pending":
 
                 conn.rollback()
 
-                return False, (
+                return (
+                    False,
                     "تمت معالجة الطلب مسبقاً."
                 )
 
-            # تحويل الحالة إلى processing
             cur.execute(
                 """
                 UPDATE withdrawals
@@ -764,18 +884,21 @@ def process_withdrawal(
             cur.close()
             conn.close()
 
-            return False, str(e)
+            return (
+                False,
+                str(e)
+            )
 
         cur.close()
         conn.close()
 
-        # إرسال BNB خارج قاعدة البيانات
         success, txid, error = send_bnb(
             wallet,
             amount
         )
 
         conn = get_db()
+
         cur = conn.cursor()
 
         try:
@@ -800,15 +923,18 @@ def process_withdrawal(
 
                 conn.commit()
 
-                return True, txid
+                return (
+                    True,
+                    txid
+                )
 
             else:
 
-                # إعادة المبلغ للمستخدم
                 cur.execute(
                     """
                     UPDATE users
-                    SET balance = balance + %s
+                    SET balance =
+                        balance + %s
                     WHERE user_id = %s
                     """,
                     (
@@ -835,7 +961,10 @@ def process_withdrawal(
 
                 conn.commit()
 
-                return False, error
+                return (
+                    False,
+                    error
+                )
 
         except Exception as e:
 
@@ -846,7 +975,10 @@ def process_withdrawal(
                 e
             )
 
-            return False, str(e)
+            return (
+                False,
+                str(e)
+            )
 
         finally:
 
@@ -965,13 +1097,11 @@ async def button_handler(
 
     user_id = query.from_user.id
 
-    # -----------------------------------------------------
-    # التعدين
-    # -----------------------------------------------------
-
     if query.data == "mine":
 
-        user = get_user(user_id)
+        user = get_user(
+            user_id
+        )
 
         if user is None:
 
@@ -980,11 +1110,14 @@ async def button_handler(
                 query.from_user.username or ""
             )
 
-            user = get_user(user_id)
+            user = get_user(
+                user_id
+            )
 
         if user[3] == 0:
 
             conn = get_db()
+
             cur = conn.cursor()
 
             cur.execute(
@@ -1018,10 +1151,6 @@ async def button_handler(
                 "⛏️ التعدين يعمل بالفعل."
             )
 
-    # -----------------------------------------------------
-    # الرصيد
-    # -----------------------------------------------------
-
     elif query.data == "balance":
 
         balance = update_mining(
@@ -1033,10 +1162,6 @@ async def button_handler(
             + str(round(balance, 8))
             + " BNB"
         )
-
-    # -----------------------------------------------------
-    # الإحالات
-    # -----------------------------------------------------
 
     elif query.data == "referrals":
 
@@ -1054,19 +1179,11 @@ async def button_handler(
             + link
         )
 
-    # -----------------------------------------------------
-    # اليومية
-    # -----------------------------------------------------
-
     elif query.data == "daily":
 
         await query.message.reply_text(
             "🎁 المكافأة اليومية سيتم تفعيلها لاحقاً."
         )
-
-    # -----------------------------------------------------
-    # السحب
-    # -----------------------------------------------------
 
     elif query.data == "withdraw":
 
@@ -1089,6 +1206,7 @@ async def button_handler(
             return
 
         conn = get_db()
+
         cur = conn.cursor()
 
         cur.execute(
@@ -1096,7 +1214,8 @@ async def button_handler(
             SELECT id
             FROM withdrawals
             WHERE user_id = %s
-            AND status IN (
+            AND status IN
+            (
                 'pending',
                 'processing'
             )
@@ -1157,10 +1276,6 @@ async def message_handler(
 
     text = update.message.text.strip()
 
-    # -----------------------------------------------------
-    # المبلغ
-    # -----------------------------------------------------
-
     if step == "amount":
 
         try:
@@ -1219,17 +1334,13 @@ async def message_handler(
         ] = "wallet"
 
         await update.message.reply_text(
-            "💳 الآن أرسل عنوان إيداع Binance.\n\n"
-            "⚠️ اختر في Binance:\n"
+            "💳 أرسل عنوان إيداع Binance.\n\n"
+            "⚠️ في Binance اختر:\n"
             "BNB → Deposit → BNB Smart Chain (BEP20)\n\n"
             "يجب أن يبدأ العنوان بـ 0x"
         )
 
         return
-
-    # -----------------------------------------------------
-    # العنوان
-    # -----------------------------------------------------
 
     if step == "wallet":
 
@@ -1241,7 +1352,7 @@ async def message_handler(
 
             await update.message.reply_text(
                 "❌ عنوان BNB غير صحيح.\n\n"
-                "يجب أن يكون عنواناً يبدأ بـ 0x وطوله 42 حرفاً."
+                "يجب أن يبدأ بـ 0x وطوله 42 حرفاً."
             )
 
             return
@@ -1260,7 +1371,6 @@ async def message_handler(
 
             return
 
-        # إنشاء الطلب وحجز الرصيد
         success, result = create_withdrawal(
             user_id,
             update.effective_user.username or "",
@@ -1294,7 +1404,6 @@ async def message_handler(
             "⚡ جاري إرسال BNB..."
         )
 
-        # معالجة الإرسال
         success, txid_or_error = process_withdrawal(
             withdrawal_id
         )
@@ -1314,7 +1423,6 @@ async def message_handler(
                 "يمكنك متابعة المعاملة على BSCScan."
             )
 
-            # إشعار الأدمن
             if ADMIN_ID != 123456789:
 
                 try:
@@ -1339,7 +1447,10 @@ async def message_handler(
 
                 except Exception as e:
 
-                    print(e)
+                    print(
+                        "Admin notification error:",
+                        e
+                    )
 
         else:
 
@@ -1373,6 +1484,7 @@ async def admin_command(
     )
 
     conn = get_db()
+
     cur = conn.cursor()
 
     cur.execute(
@@ -1404,11 +1516,15 @@ async def admin_command(
 
     if not rows:
 
-        text += "📭 لا توجد طلبات سحب."
+        text += (
+            "📭 لا توجد طلبات سحب."
+        )
 
     else:
 
-        text += "📋 آخر السحوبات:\n\n"
+        text += (
+            "📋 آخر السحوبات:\n\n"
+        )
 
         for row in rows:
 
@@ -1450,13 +1566,17 @@ def main():
 
     if not TOKEN:
 
-        print("BOT_TOKEN غير موجود")
+        print(
+            "BOT_TOKEN غير موجود"
+        )
 
         return
 
     if not DATABASE_URL:
 
-        print("DATABASE_URL غير موجود")
+        print(
+            "DATABASE_URL غير موجود"
+        )
 
         return
 
@@ -1478,7 +1598,6 @@ def main():
 
         return
 
-    # تهيئة BSC
     blockchain_ready = (
         init_blockchain()
     )
@@ -1496,7 +1615,6 @@ def main():
         .build()
     )
 
-    # Start
     application.add_handler(
         CommandHandler(
             "start",
@@ -1504,7 +1622,6 @@ def main():
         )
     )
 
-    # لوحة الأدمن
     application.add_handler(
         CommandHandler(
             "withdrawals",
@@ -1512,14 +1629,12 @@ def main():
         )
     )
 
-    # أزرار المستخدم
     application.add_handler(
         CallbackQueryHandler(
             button_handler
         )
     )
 
-    # الرسائل النصية للسحب
     application.add_handler(
         MessageHandler(
             filters.TEXT & ~filters.COMMAND,
