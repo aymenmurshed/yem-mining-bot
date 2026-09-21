@@ -1,3 +1,5 @@
 python-telegram-bot==21.10
 psycopg2-binary
 web3>=7.0,<8.0
+flask
+gunicorn
